@@ -10,9 +10,32 @@ app.use(express.json());
 
 app.use("/customer",session({secret:"fingerprint_customer",resave: true, saveUninitialized: true}))
 
-app.use("/customer/auth/*", function auth(req,res,next){
-//Write the authenication mechanism here
+app.use("/customer/auth/*", function auth(req, res, next) {
+  try {
+    // Ensure session & token exist
+    if (!req.session || !req.session.authorization) {
+      return res.status(403).json({ message: "User not logged in" });
+    }
+
+    const { accessToken } = req.session.authorization;
+    if (!accessToken) {
+      return res.status(403).json({ message: "Access token missing" });
+    }
+
+    // Verify JWT (must match the secret used when signing, e.g., "access")
+    jwt.verify(accessToken, "access", (err, decoded) => {
+      if (err) {
+        return res.status(403).json({ message: "User not authenticated" });
+      }
+      // Attach decoded payload (e.g., username) for downstream handlers
+      req.user = decoded;
+      return next();
+    });
+  } catch (e) {
+    return res.status(500).json({ message: "Internal authentication error" });
+  }
 });
+
  
 const PORT =5000;
 
